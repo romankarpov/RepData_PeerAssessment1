@@ -7,19 +7,120 @@ output:
 
 
 ## Loading and preprocessing the data
+```{r message=FALSE}
+library(dplyr)
+library(ggplot2)
+activityData <- read.csv(file = unz("activity.zip", "activity.csv"))
 
+sm_by_date <- activityData %>% group_by(date) %>% 
+  summarise(total_steps = sum(steps, na.rm = TRUE))
+
+sm_by_interval <- activityData %>% group_by(interval) %>%
+  summarise(avg = mean(steps, na.rm = TRUE))
+
+
+```
 
 
 ## What is mean total number of steps taken per day?
+Here is the histogram of total steps
+```{r}
+library(ggplot2)
+ggplot(data = sm_by_date, aes(sm_by_date$total_steps)) + geom_histogram(binwidth = 5000)
+```
 
-
+Mean value of total steps
+```{r}
+mean(sm_by_date$total_steps)
+```
+ 
+Median value of total steps:
+ 
+```{r}
+ median(sm_by_date$total_steps)
+```
 
 ## What is the average daily activity pattern?
 
+```{r}
 
+ggplot(data=sm_by_interval, aes(interval, avg)) +
+  geom_line(size = 1) 
+
+
+```
+
+Let's find five minute interval with maximum steps
+
+```{r}
+max_number_of_steps <- max(sm_by_interval$avg)
+
+print(max_number_of_steps)
+
+sm_by_interval %>% filter(avg == max_number_of_steps)
+
+```
 
 ## Imputing missing values
 
+Total number of observations with missing vaues
+```{r}
+sum(is.na(activityData$steps))
+```
 
+Imputing missing values with mean value for a specific interval 
+```{r}
+imputed_activity_data <- left_join(activityData, sm_by_interval, by = c("interval", "interval"))
+imputed_activity_data <- mutate(imputed_activity_data, imputed_steps = ifelse(is.na(steps), round(avg), steps))
+head(imputed_activity_data)
+```
+
+Now make it look like original data set
+
+```{r}
+imputed_activity_data <- select(imputed_activity_data, imputed_steps, date, interval)
+colnames(imputed_activity_data)[1]<-"steps"
+head(imputed_activity_data)
+```
+
+Here is the histogram of total steps with imputed data
+
+```{r}
+ library(ggplot2)
+ sm_by_date <- imputed_activity_data %>% group_by(date) %>% 
+  summarise(total_steps = sum(steps, na.rm = TRUE))
+ 
+ggplot(data = sm_by_date, aes(sm_by_date$total_steps)) + geom_histogram(binwidth = 5000)
+```
+
+Mean value of total steps
+```{r}
+mean(sm_by_date$total_steps)
+```
+ 
+Median value of total steps:
+ 
+```{r}
+ median(sm_by_date$total_steps)
+```
+
+You can see that imputing the missing data with averages by time period has changed the distribution and sample mean and median. Both mean and median for imputed data set is larger then original 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Let's add a week day / weekend indicator to the impuded data set. 
+
+```{r}
+imputed_activity_data <- mutate(imputed_activity_data,
+                                weekday = as.factor(ifelse(weekdays(as.Date(imputed_activity_data$date)) %in% c("Sunday", "Saturday"), "Weekend", "Weekday")))
+
+sm_by_interval_wd <- imputed_activity_data %>% group_by(weekday, interval) %>% summarise(avg = mean(steps))
+```
+
+Now let's plot daily activity by for weekdays and weekends
+
+```{r}
+ggplot(data=sm_by_interval_wd, aes(interval, avg)) +
+  geom_line(size = 1) + facet_grid(weekday ~ .)
+
+```
